@@ -52,7 +52,7 @@ function recallOrderNo(callback) {
 }
 
 // Callback function for json-2-csv
-var j2cCallback = function(err, csv) {
+function j2cCallback(err, csv) {
   if (err) throw err;
   // Generate csv for OMDB import
   fs.writeFile(fileName, csv, function(err) {
@@ -131,7 +131,7 @@ function getOrders(orderId) {
             orderObj.poNumberZinus = ord.order_number;
             orderObj.headerDisc = discountAmount;
             orderObj.totalDisc = ord.total_discounts;
-            
+
             // Start Line Item assignment
             orderObj.itemLineNo = j + 1; // 1-based index
             orderObj.itemLine.sku = ln.sku;
