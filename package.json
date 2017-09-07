@@ -1,0 +1,21 @@
+{
+  "name": "test",
+  "version": "1.0.0",
+  "description": "",
+  "main": "shopify_connection_test.js",
+  "dependencies": {
+    "async": "^2.5.0",
+    "csv-parse": "^1.2.1",
+    "flat": "^4.0.0",
+    "json2csv": "^3.11.1",
+    "limiter": "^1.1.2",
+    "request": "^2.81.0",
+    "underscore": "^1.8.3"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC"
+}
