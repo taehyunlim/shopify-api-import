@@ -62,10 +62,10 @@ function j2cCallback(err, csv) {
   // Record last range of order_number to lastImport.csv
   fs.writeFile(lastImportOrderIdCsv, lastImportOrderIdEnd, function(err) {
     if (err) throw err;
-    //console.log('Last Import order_number saved');
   })
 }
 
+// Main API Request Call function
 function getOrders(orderId) {
   console.log("Check lastImportOrderIdStart: "+ orderId);
   request(
@@ -73,82 +73,103 @@ function getOrders(orderId) {
       url: baseurl+'/admin/orders.json?financial_status=paid&since_id=' + orderId,
       json: true,
     }, function (error, response, body) {
+      // console.log(body.orders); // Debug
+      if (error) throw error;
+      // If there is no new order found
+      if (body.orders.length === 0) {
+        console.log("No order received since OrderId: " + orderId);
+        return;
+      }
       //console.log(response.statusCode);
       if (!error && response.statusCode === 200 && body.orders.length > 0) {
-        var orders = [];
+        // Objects Array for Orders
+        var ordersList = [];
+        // Nested loop through line_items (ln) and order objects (ord)
         for (var i = 0; i < body.orders.length; i++) {
-          // START OF TEST: HARDCODED DISCOUNT_CODES.LENGTH = 0; USE HEADER DISCOUNT ONLY ONCE
-          var discountAmount = '';
+
+          // BEGIN TEST: CART LEVEL DISCOUNT CODE
           if (body.orders[i].discount_codes[0] != null ) {
-            discountAmount = body.orders[i].discount_codes[0].amount;
-          }
-          // END OF TEST
+            // HARDCODED: ONLY ONE DISCONT CODE TAKEN
+            var discount_codes_amount_test = body.orders[i].discount_codes[0].amount;
+          } //END TEST
+
+          // Rename iteratee to "ord"
           var ord = body.orders[i];
           for (var j = 0; j < ord.line_items.length; j++) {
+            // Declare empty object var for order object "ordObj"
             var orderObj = {
-              orderObjIndex: 0,
+              order_index: 0,
               shopifyOrderId: '',
-              shpName: '',
-              shpAdd1: '',
-              shpAdd2: '',
-              shpCity: '',
-              shpState: '',
-              shpZip: '',
-              shpCountry: '',
-              shpPhone: '',
-              email: '',
-              poNumber: '',
-              dateCreated: '',
-              poNumberZinus: '',
-              headerDisc: '',
-              totalDisc: '',
-              itemLineNo: 0,
-              itemLine: {}
+              shipping_address_name: '',
+              shipping_address_1: '',
+              shipping_address_2: '',
+              shipping_address_city: '',
+              shipping_address_state: '',
+              shipping_address_zip: '',
+              shipping_address_country: '',
+              shipping_address_phone: '',
+              contact_email: '',
+              zinus_po: '',
+              created_at: '',
+              order_number: '',
+              total_price: '',
+              total_line_items_price: '',
+              subtotal_price: '',
+              total_tax: '',
+              discount_codes_amount: '',
+              total_discounts: '',
+              line_items_index: 0,
+              line_items: {
+                tax_price: '',
+                tax_rate: ''
+              }
             };
+            // Rename iteratee to "ln"
             var ln = ord.line_items[j];
-            var lineObj = {
-              sku: '',
-              qty: '',
-              price: '',
-              tax: '',
-              rcyFee: '',
-              itemDisc: ''
-            };
-            // Start Order Object assignment
-            orderObj.orderObjIndex = i;
+            // Assign ordObj values
+            orderObj.order_index = i + 1; // 1-based index
             orderObj.shopifyOrderId = ord.id;
-            orderObj.shpName = ord.shipping_address.name;
-            orderObj.shpAdd1 = ord.shipping_address.address1;
-            orderObj.shpAdd2 = ord.shipping_address.address2;
-            orderObj.shpCity = ord.shipping_address.city;
-            orderObj.shpState = ord.shipping_address.province;
-            orderObj.shpZip = ord.shipping_address.zip;
-            orderObj.shpCountry = ord.shipping_address.country;
-            orderObj.shpPhone = ord.shipping_address.phone;
-            orderObj.email = ord.contact_email;
-            orderObj.poNumber = "ZC" + ord.order_number;
-            orderObj.dateCreated = ord.created_at;
-            orderObj.poNumberZinus = ord.order_number;
-            orderObj.headerDisc = discountAmount;
-            orderObj.totalDisc = ord.total_discounts;
-
-            // Start Line Item assignment
-            orderObj.itemLineNo = j + 1; // 1-based index
-            orderObj.itemLine.sku = ln.sku;
-            orderObj.itemLine.qty = ln.quantity;
-            orderObj.itemLine.price = ln.price;
-            orderObj.itemLine.rcyFee = "Test";
-            orderObj.itemLine.itemDisc = ln.total_discount;
-            //orderObj.itemLine = lineObj;
-            orders.push(orderObj);
+            orderObj.shipping_address_name = ord.shipping_address.name;
+            orderObj.shipping_address_1 = ord.shipping_address.address1;
+            orderObj.shipping_address_2 = ord.shipping_address.address2;
+            orderObj.shipping_address_city = ord.shipping_address.city;
+            orderObj.shipping_address_state = ord.shipping_address.province;
+            orderObj.shipping_address_zip = ord.shipping_address.zip;
+            orderObj.shipping_address_country = ord.shipping_address.country;
+            orderObj.shipping_address_phone = ord.shipping_address.phone;
+            orderObj.contact_email = ord.contact_email;
+            orderObj.zinus_po = "ZC" + ord.order_number;
+            orderObj.created_at = ord.created_at;
+            orderObj.order_number = ord.order_number;
+            orderObj.total_price = ord.total_price;
+            orderObj.total_line_items_price = ord.total_line_items_price;
+            orderObj.subtotal_price = ord.subtotal_price;
+            orderObj.total_tax = ord.total_tax;
+            orderObj.discount_codes_amount = discount_codes_amount_test; // HARDCODED
+            orderObj.total_discounts = ord.total_discounts;
+            orderObj.line_items_index = j + 1; // 1-based index
+            // Assign ln values
+            orderObj.line_items.sku = ln.sku;
+            orderObj.line_items.qty = ln.quantity;
+            orderObj.line_items.price = ln.price;
+            orderObj.line_items.recycling_fee = "Test";
+            orderObj.line_items.discount = ln.total_discount;
+            // HARDCODED: ONLY TAKES SINGLE TAX LINE PER LINE ITEM
+            if (ln.tax_lines.length > 0) {
+              orderObj.line_items.tax_price = ln.tax_lines[0].price
+              orderObj.line_items.tax_rate = ln.tax_lines[0].rate
+            }
+            // Add assigned object to ordersList array
+            ordersList.push(orderObj);
           } // end of loop: line_items
         } // end of loop: orders
-        //console.log('order count: ' + orders[orders.length-1].orderObjIndex);
-        console.log('Ending Order_number: ' + orders[orders.length-1].poNumberZinus);
-        console.log('Ending lastImportOrderId: ' + orders[orders.length-1].shopifyOrderId);
-        lastImportOrderIdEnd = orders[orders.length-1].shopifyOrderId;
+        console.log('order count: ' + ordersList[ordersList.length-1].order_index);
+        console.log('Ending Order_number: ' + ordersList[ordersList.length-1].zinus_po);
+        console.log('Ending lastImportOrderId: ' + ordersList[ordersList.length-1].shopifyOrderId);
+        lastImportOrderIdEnd = ordersList[ordersList.length-1].shopifyOrderId;
 
-        j2c.json2csv(orders, j2cCallback);
+        // Convert json objects to csv
+        j2c.json2csv(ordersList, j2cCallback);
       };
     } // end of request callback
 )}; // end of getOrders funciton
