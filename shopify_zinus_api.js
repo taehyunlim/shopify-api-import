@@ -19,8 +19,7 @@ var shopname = config.shopify_shopname;
 
 // Global Variables
 var baseurl = 'https://'+apikey+':'+password+'@'+shopname+'.myshopify.com';
-//var attrFields = '?fields=created_at,id,name,total-price'
-var attrFields = ''; // Update attrFields variable after recallOrderNo
+//var attrFields = '';
 var csvFields = ['created_at', 'id', 'name', 'total_price'];
 var j2cOptions = { keys: csvFields };
 var timestring = moment().format("YYYYMMDD_HHmm");
@@ -32,21 +31,33 @@ var lastImportOrderIdEnd = '';
 // Recall last imported order_number
 function recallOrderNo(callback) {
   fs.readFile(lastImportOrderIdCsv, function(err, fileData){
+    if (err) {
+      // Base case when lastImportOrderId DNE
+      if (err.code === 'ENOENT') {
+        console.error('No lastImport found. Creating lastImport.csv');
+        fs.writeFile(lastImportOrderIdCsv, "", function(err) {
+          if (err) throw err;
+        });
+        // Set initial value for lastImportOrderId to 0;
+        fileData = '0';
+      } else { throw err; }
+    }
     parse(fileData, function(err, output) {
+      if (err) throw err;
       lastImportOrderIdStart = output[0][0];
-      //console.log('Starting lastImportOrderId: ' + lastImportOrderIdStart);
+      // Run Shopify API call to get orders
       getOrders(lastImportOrderIdStart);
     });
   });
 }
 
 // Callback function for json-2-csv
-function j2cCallback(err, csv) {
+var j2cCallback = function(err, csv) {
   if (err) throw err;
   // Generate csv for OMDB import
   fs.writeFile(fileName, csv, function(err) {
     if (err) throw err;
-    console.log('File saved under: ' + __dirname + ' ' + timestring);
+    console.log('File saved under: [' + __dirname + ']@[' + timestring + ']');
   });
   // Record last range of order_number to lastImport.csv
   fs.writeFile(lastImportOrderIdCsv, lastImportOrderIdEnd, function(err) {
@@ -55,7 +66,6 @@ function j2cCallback(err, csv) {
   })
 }
 
-// API Request
 function getOrders(orderId) {
   console.log("Check lastImportOrderIdStart: "+ orderId);
   request(
@@ -121,6 +131,7 @@ function getOrders(orderId) {
             orderObj.poNumberZinus = ord.order_number;
             orderObj.headerDisc = discountAmount;
             orderObj.totalDisc = ord.total_discounts;
+            
             // Start Line Item assignment
             orderObj.itemLineNo = j + 1; // 1-based index
             orderObj.itemLine.sku = ln.sku;
