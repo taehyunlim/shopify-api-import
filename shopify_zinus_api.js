@@ -116,7 +116,7 @@ function getOrders(orderId) {
           for (var j = 0; j < ord.line_items.length; j++) {
             // Declare temporary object to hold values
             var orderObj = {
-              documentNo: parseInt(lastDocumentIdStart) + 1,
+              documentNo: parseInt(lastDocumentIdStart) + 1, // Update document number by adding 1;
               documentTime: timestring,
               order_index: 0,
               shopifyOrderId: '',
@@ -258,7 +258,7 @@ function getOrders(orderId) {
           var orderImport = ordersList[i]
           var orderImportObjCopy = {};
           orderImportObjCopy.ISACONTROLNO = orderImport.shopifyOrderId;
-          orderImportObjCopy.DOCUMENTNO = 1;
+          orderImportObjCopy.DOCUMENTNO = orderImport.documentNo;
           orderImportObjCopy.ISAID = 'ZINUS.COM';
           orderImportObjCopy.SHIPTO = '';
           orderImportObjCopy.SHPNAME = orderImport.shipping_address_name;
