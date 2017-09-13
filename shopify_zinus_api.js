@@ -20,7 +20,7 @@ var shopname = config.shopify_shopname;
 // Global variables
 var baseurl = 'https://'+apikey+':'+password+'@'+shopname+'.myshopify.com';
 var timestring = moment().format("YYYYMMDD_HHmm");
-var incomingPathName = './Incoming/' //'ShopifyOrders_' + timestring +'.csv';
+var incomingPathName = './Incoming/' //'ShopifyAPI_Orders_' + timestring +'.csv';
 var incomingFileName = 'ShopifyAPI_Orders_'
 var importPathName = './Import/' //'OE_NewOrder_' + timestring + '_ZINUS.csv';
 var importFileName = 'OE_NewOrder_'
@@ -62,7 +62,7 @@ function j2cCallbackIncoming(err, csv) {
   lastDocumentIdEnd = parseInt(lastDocumentIdStart) + 1;
   if (err) throw err;
   // Generate csv for Incoming Directory
-  fs.writeFile(incomingPathName + incomingFileName + timestring + '.csv', csv, function(err) {
+  fs.writeFile(incomingPathName + incomingFileName + timestring + '_ZINUS.csv', csv, function(err) {
     if (err) throw err;
     console.log('File saved under: [' + __dirname + '\\Incoming\\]@[' + timestring + ']');
   });
