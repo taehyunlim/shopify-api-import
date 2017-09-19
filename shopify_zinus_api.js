@@ -30,7 +30,8 @@ var lastImportOrderIdEnd = '';
 var lastDocumentIdStart = '';
 var lastDocumentIdEnd = '';
 
-// Recall last imported orderId
+// Recall last imported orderId and document Id.
+// Note: Document Id is 1-based index for each order import file created by this API connection
 function recallOrderId(callback) {
   fs.readFile(lastImportCsv, function(err, fileData){
     if (err) {
@@ -44,25 +45,27 @@ function recallOrderId(callback) {
         fileData = '0, 0';
       } else { throw err; }
     }
+    // if lastImportCsv is present then parse data and assign to global variables
     parse(fileData, function(err, output) {
       if (err) throw err;
-      // Load lastImportOrderId and lastDocumentId
+      // Load lastImportOrderId and lastDocumentId from row 0
       lastImportOrderIdStart = output[0][0];
       lastDocumentIdStart = output[0][1];
       console.log('Check lastDocumentIdStart: ' + lastDocumentIdStart);
-      // Run Shopify API call to get orders
+
+      // Finally, run Shopify API call to get orders
       getOrders(lastImportOrderIdStart);
     });
   });
 }
 
-// Callback function for json-2-csv: Incoming API result file
+// Callback function for json-2-csv: Incoming API result file (For archive purpose)
 function j2cCallbackIncoming(err, csv) {
   // Update ending lastDocumentId
   lastDocumentIdEnd = parseInt(lastDocumentIdStart) + 1;
   if (err) throw err;
-  // Generate csv for Incoming Directory
-  fs.writeFile(incomingPathName + incomingFileName + timestring + '_ZINUS.csv', csv, function(err) {
+  // Generate csv for Incoming directory
+  fs.writeFile(incomingPathName + incomingFileName + timestring + '.csv', csv, function(err) {
     if (err) throw err;
     console.log('File saved under: [' + __dirname + '\\Incoming\\]@[' + timestring + ']');
   });
@@ -72,24 +75,26 @@ function j2cCallbackIncoming(err, csv) {
   })
 }
 
-// Callback function for json-2-csv: Import file
+// Callback function for json-2-csv: Import file (For OMP)
 function j2cCallbackImport(err, csv) {
   if (err) throw err;
-  // Generate csv for Incoming Directory
-  fs.writeFile(importPathName + importFileName + timestring + '.csv', csv, function(err) {
+  // Generate csv for Import directory
+  fs.writeFile(importPathName + importFileName + timestring + '_ZINUS.csv', csv, function(err) {
     if (err) throw err;
     console.log('File saved under: [' + __dirname + '\\Import\\]@[' + timestring + ']');
   });
 }
 
-// Main API Request Call function
+// API Request Call
 function getOrders(orderId) {
   console.log("Check lastImportOrderIdStart: "+ orderId);
   request(
     {
-      url: baseurl+'/admin/orders.json?financial_status=paid&since_id=' + orderId,
+      // API call limit at 200 orders per request
+      url: baseurl+'/admin/orders.json?financial_status=paid&limit=200&since_id=' + orderId,
       json: true,
     }, function (error, response, body) {
+      //console.log(response.statusCode); //Debug
       // console.log(body.orders); // Debug
       if (error) throw error;
       // If there is no new order found
@@ -97,21 +102,22 @@ function getOrders(orderId) {
         console.log("No order received since OrderId: " + orderId);
         return;
       }
-      //console.log(response.statusCode);
       if (!error && response.statusCode === 200 && body.orders.length > 0) {
         // Objects Array for Orders
         var ordersList = [];
         var cart_subtotal_list = [];
         // Nested loop through line_items (ln) and order objects (ord)
+        // Outer loop starts
         for (var i = 0; i < body.orders.length; i++) {
           // Variable for cart subtotal loop
           var cart_subtotal_helper = 0;
-          // Rename iteratee to "ord"
+          // Rename iteration variable to "ord"
           var ord = body.orders[i];
+          // Nested loop starts
           for (var j = 0; j < ord.line_items.length; j++) {
-            // Declare empty object var for order object "ordObj"
+            // Declare temporary object to hold values
             var orderObj = {
-              documentNo: parseInt(lastDocumentIdStart) + 1,
+              documentNo: parseInt(lastDocumentIdStart) + 1, // Update document number by adding 1;
               documentTime: timestring,
               order_index: 0,
               shopifyOrderId: '',
@@ -150,7 +156,7 @@ function getOrders(orderId) {
                 unit_price: '',
               }
             };
-            // Rename iteratee to "ln"
+            // Rename iteration variable to "ln"
             var ln = ord.line_items[j];
             // Assign ordObj values
             orderObj.order_index = i + 1; // 1-based index
@@ -235,10 +241,14 @@ function getOrders(orderId) {
           }
         });
 
-        console.log('order count: ' + ordersList[ordersList.length-1].order_index);
-        console.log('Ending Order_number: ' + ordersList[ordersList.length-1].zinus_po);
-        console.log('Ending lastImportOrderId: ' + ordersList[ordersList.length-1].shopifyOrderId);
+        // Update ending lastImportOrderId
         lastImportOrderIdEnd = ordersList[ordersList.length-1].shopifyOrderId;
+
+        // Log summary
+        console.log('Ending lastDocumentId: ' + ordersList[ordersList.length-1].documentNo);
+        console.log('Ending lastImportOrderId: ' + lastImportOrderIdEnd);
+        console.log('Ending PO Number: ' + ordersList[ordersList.length-1].zinus_po);
+        console.log('Unqiue Order Count: ' + ordersList[ordersList.length-1].order_index);
 
         // Convert json objects to csv and write in Incoming
         j2c.json2csv(ordersList, j2cCallbackIncoming);
@@ -249,7 +259,7 @@ function getOrders(orderId) {
           var orderImport = ordersList[i]
           var orderImportObjCopy = {};
           orderImportObjCopy.ISACONTROLNO = orderImport.shopifyOrderId;
-          orderImportObjCopy.DOCUMENTNO = 1;
+          orderImportObjCopy.DOCUMENTNO = orderImport.documentNo;
           orderImportObjCopy.ISAID = 'ZINUS.COM';
           orderImportObjCopy.SHIPTO = '';
           orderImportObjCopy.SHPNAME = orderImport.shipping_address_name;
@@ -266,11 +276,11 @@ function getOrders(orderId) {
           orderImportObjCopy.PONUMBER = orderImport.zinus_po;
           orderImportObjCopy.REFERENCE = '';
           orderImportObjCopy.ORDDATE = moment(orderImport.created_at).format("MM/DD/YYYY");
-          orderImportObjCopy.TD503 = 'FedEx Ground';
+          orderImportObjCopy.TD503 = '';
           orderImportObjCopy.TD505 = '';
           orderImportObjCopy.TD512 = '';
-          orderImportObjCopy.EXPDATE = moment(orderImport.created_at).add(5, 'day').format("MM/DD/YYYY");
-          orderImportObjCopy.DELVBYDATE = moment(orderImport.created_at).add(10, 'day').format("MM/DD/YYYY");
+          orderImportObjCopy.EXPDATE = moment(orderImport.created_at).add(5, 'day').format("YYYY/MM/DD");
+          orderImportObjCopy.DELVBYDATE = moment(orderImport.created_at).add(10, 'day').format("YYYY/MM/DD");
           orderImportObjCopy.WHCODE = '';
           orderImportObjCopy.STATUS = 0;
           orderImportObjCopy.OPTORD01 = orderImport.order_number;
@@ -281,7 +291,7 @@ function getOrders(orderId) {
           orderImportObjCopy.OPTORD06 = orderImport.discount_codes_amount;
           orderImportObjCopy.OPTORD07 = orderImport.discount_fixed_amount;
           orderImportObjCopy.OPTORD08 = orderImport.total_discounts;
-          orderImportObjCopy.OPTORD09 = '';
+          orderImportObjCopy.OPTORD09 = 'FedEx Ground';
           orderImportObjCopy.OPTORD10 = '';
           orderImportObjCopy.OPTORD11 = '';
           orderImportObjCopy.OPTORD12 = '';
@@ -312,3 +322,6 @@ function getOrders(orderId) {
 )}; // end of getOrders funciton
 
 recallOrderId();
+
+
+// Test Git upload
